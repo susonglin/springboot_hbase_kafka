@@ -4,7 +4,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
-import org.apache.log4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -19,13 +19,13 @@ import java.io.IOException;
 @Component
 public class HconnectionFactory implements InitializingBean {
 
-    Logger logger = Logger.getLogger(this.getClass());
+    protected final org.slf4j.Logger logger = LoggerFactory.getLogger(this.getClass());
 
     @Value("${hbase.zookeeper.quorum}")
     private String zkQuorum;
 
     @Value("${hbase.master}")
-    private String HBaseMaster;
+    private String hBaseMaster;
 
     @Value("${hbase.zookeeper.property.clientPort}")
     private String zkPort;
@@ -40,9 +40,9 @@ public class HconnectionFactory implements InitializingBean {
     @Override
     public void afterPropertiesSet(){
         conf.set("hbase.zookeeper.quorum", zkQuorum);
-        conf.set("hbase.zookeeper.property.clientPort",zkPort);
-        conf.set("zookeeper.znode.parent",znode);
-        conf.set("hbase.master", HBaseMaster);
+        conf.set("hbase.zookeeper.property.clientPort", zkPort);
+        conf.set("zookeeper.znode.parent", znode);
+        conf.set("hbase.master", hBaseMaster);
         try {
             connection = ConnectionFactory.createConnection(conf);
             logger.info("获取connectiont连接成功！");

@@ -5,7 +5,8 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -18,7 +19,7 @@ import java.util.List;
  */
 public class HBaseBeanUtil {
 
-    static Logger logger = Logger.getLogger(HBaseBeanUtil.class);
+    private static final Logger logger = LoggerFactory.getLogger(HBaseBeanUtil.class);
 
     /**
      * JavaBean转换为Put
@@ -37,21 +38,20 @@ public class HBaseBeanUtil {
             }
             field.setAccessible(true);
             HbaseColumn orm = field.getAnnotation(HbaseColumn.class);
-            String f = orm.family();
-            String q = orm.qualifier();
-            if (StringUtils.isBlank(f) || StringUtils.isBlank(q)) {
+            String family = orm.family();
+            String qualifier = orm.qualifier();
+            if (StringUtils.isBlank(family) || StringUtils.isBlank(qualifier)) {
                 continue;
             }
             Object fieldObj = field.get(obj);
             if (fieldObj.getClass().isArray()) {
                 logger.error("nonsupport");
             }
-            if (q.equalsIgnoreCase("rowkey") || f.equalsIgnoreCase("rowkey")) {
+            if ("rowkey".equalsIgnoreCase(qualifier) || "rowkey".equalsIgnoreCase(family)) {
                 continue;
-            } else {
-                if (field.get(obj) != null || StringUtils.isNotBlank(field.get(obj).toString())) {
-                    put.addColumn(Bytes.toBytes(f), Bytes.toBytes(q), Bytes.toBytes(field.get(obj).toString()));
-                }
+            }
+            if (field.get(obj) != null || StringUtils.isNotBlank(field.get(obj).toString())) {
+                put.addColumn(Bytes.toBytes(family), Bytes.toBytes(qualifier), Bytes.toBytes(field.get(obj).toString()));
             }
         }
         return put;
@@ -72,13 +72,13 @@ public class HBaseBeanUtil {
             Object object = field.get(obj);
             return object.toString();
         } catch (NoSuchFieldException e) {
-            logger.warn("", e);
+            logger.error("", e);
         } catch (SecurityException e) {
-            logger.warn("", e);
+            logger.error("", e);
         } catch (IllegalArgumentException e) {
-            logger.warn("", e);
+            logger.error("", e);
         } catch (IllegalAccessException e) {
-            logger.warn("", e);
+            logger.error("", e);
         }
         return "";
     }
@@ -102,18 +102,18 @@ public class HBaseBeanUtil {
                 continue;
             }
             HbaseColumn orm = field.getAnnotation(HbaseColumn.class);
-            String f = orm.family();
-            String q = orm.qualifier();
+            String family = orm.family();
+            String qualifier = orm.qualifier();
             boolean timeStamp = orm.timestamp();
-            if (StringUtils.isBlank(f) || StringUtils.isBlank(q)) {
+            if (StringUtils.isBlank(family) || StringUtils.isBlank(qualifier)) {
                 continue;
             }
             String fieldName = field.getName();
             String value = "";
-            if (f.equalsIgnoreCase("rowkey")) {
+            if ("rowkey".equalsIgnoreCase(family)) {
                 value = new String(result.getRow());
             } else {
-                value =getResultValueByType(result, f, q, timeStamp);
+                value = getResultValueByType(result, family, qualifier, timeStamp);
             }
             String firstLetter = fieldName.substring(0, 1).toUpperCase();
             String setMethodName = "set" + firstLetter + fieldName.substring(1);

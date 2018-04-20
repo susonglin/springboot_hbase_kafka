@@ -2,14 +2,19 @@ package com.muheda.notice.hbase;
 
 import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.hbase.*;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
-import org.apache.hadoop.hbase.filter.*;
+import org.apache.hadoop.hbase.filter.CompareFilter;
+import org.apache.hadoop.hbase.filter.Filter;
+import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.log4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.*;
 
 /**
@@ -20,7 +25,7 @@ import java.util.*;
 @Component("hBaseDaoUtil")
 public class HBaseDaoUtil {
 
-    Logger logger = Logger.getLogger(this.getClass());
+    protected final org.slf4j.Logger logger = LoggerFactory.getLogger(this.getClass());
 
     // 关闭连接
     public static void close() {
@@ -40,7 +45,7 @@ public class HBaseDaoUtil {
      * @param familyColumn
      * @Date: 2018/3/22
      */
-    public void createTable(String tableName, String... familyColumn) {
+    public void createTable(String tableName, Set<String> familyColumn) {
         TableName tn = TableName.valueOf(tableName);
         try (Admin admin = HconnectionFactory.connection.getAdmin();) {
             HTableDescriptor htd = new HTableDescriptor(tn);
@@ -51,6 +56,7 @@ public class HBaseDaoUtil {
             admin.createTable(htd);
         } catch (IOException e) {
             e.printStackTrace();
+            logger.error("创建"+tableName+"表失败！", e);
         }
     }
 
@@ -67,150 +73,8 @@ public class HBaseDaoUtil {
             admin.deleteTable(tn);
         } catch (IOException e) {
             e.printStackTrace();
+            logger.error("删除"+tableName+"表失败！");
         }
-    }
-
-    /**
-     * @Descripton: 插入或者更新数据
-     * @Author: Sorin
-     * @param tableName
-     * @param rowKey
-     * @param family
-     * @param qualifier
-     * @param value
-     * @Date: 2018/3/22
-     */
-    public boolean insert(String tableName, String rowKey, String family, String qualifier, String value) {
-        try (Table table = HconnectionFactory.connection.getTable(TableName.valueOf(tableName));){
-            Put put = new Put(Bytes.toBytes(rowKey));
-            put.addColumn(Bytes.toBytes(family), Bytes.toBytes(qualifier), Bytes.toBytes(value));
-            table.put(put);
-            return true;
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return false;
-    }
-
-    /**
-     * @Descripton: 删除
-     * @Author: Sorin
-     * @param tableName
-     * @param rowKey
-     * @param family
-     * @param qualifier
-     * @Date: 2018/3/22
-     */
-    public boolean delete(String tableName, String rowKey, String family, String qualifier) {
-        try (Table table = HconnectionFactory.connection.getTable(TableName.valueOf(tableName));){
-            Delete del = new Delete(Bytes.toBytes(rowKey));
-            if (qualifier != null) {
-                del.addColumn(Bytes.toBytes(family), Bytes.toBytes(qualifier));
-            } else if (family != null) {
-                del.addFamily(Bytes.toBytes(family));
-            }
-            table.delete(del);
-            return true;
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return false;
-    }
-
-    /**
-     * @Descripton: 删除一行
-     * @Author: Sorin
-     * @param tableName
-     * @param rowKey
-     * @Date: 2018/3/22
-     */
-    public boolean delete(String tableName, String rowKey) {
-        return delete(tableName, rowKey, null, null);
-    }
-
-    /**
-     * @Descripton: 删除一行下的一个列族
-     * @Author: Sorin
-     * @param tableName
-     * @param rowKey
-     * @param family
-     * @Date: 2018/3/22
-     */
-    public boolean delete(String tableName, String rowKey, String family) {
-        return delete(tableName, rowKey, family, null);
-    }
-
-    /**
-     * @Descripton: 数据读取（取到一个值）
-     * @Author: Sorin
-     * @param tableName
-     * @param rowKey
-     * @param family
-     * @param qualifier
-     * @Date: 2018/3/22
-     */
-    public String query(String tableName, String rowKey, String family, String qualifier) {
-        try (Table table = HconnectionFactory.connection.getTable(TableName.valueOf(tableName));){
-            Get get = new Get(Bytes.toBytes(rowKey));
-            get.addColumn(Bytes.toBytes(family), Bytes.toBytes(qualifier));
-            Result r = table.get(get);
-            return Bytes.toString(CellUtil.cloneValue(r.listCells().get(0)));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    /**
-     * @Descripton: 取到一个族列的值
-     * @Author: Sorin
-     * @param tableName
-     * @param rowKey
-     * @param family
-     * @Date: 2018/3/22
-     */
-    public Map<String, String> query(String tableName, String rowKey, String family) {
-        Map<String, String> result = null ;
-        try (Table table = HconnectionFactory.connection.getTable(TableName.valueOf(tableName));){
-            Get get = new Get(Bytes.toBytes(rowKey));
-            get.addFamily(Bytes.toBytes(family));
-            Result r = table.get(get);
-            List<Cell> cs = r.listCells();
-            result = cs.size() > 0 ? new HashMap<String, String>() : result;
-            for (Cell cell : cs) {
-                result.put(Bytes.toString(CellUtil.cloneQualifier(cell)), Bytes.toString(CellUtil.cloneValue(cell)));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return result;
-    }
-
-    /**
-     * @Descripton: 取到多个族列的值
-     * @Author: Sorin
-     * @param tableName
-     * @param rowKey
-     * @Date: 2018/3/22
-     */
-    public Map<String, Map<String, String>> query(String tableName, String rowKey) {
-        Map<String, Map<String, String>> results = null ;
-        try (Table table = HconnectionFactory.connection.getTable(TableName.valueOf(tableName));){
-            Get get = new Get(Bytes.toBytes(rowKey));
-            Result r = table.get(get);
-            List<Cell> cs = r.listCells();
-            results = cs.size() > 0 ? new HashMap<String, Map<String, String>> () : results;
-            for (Cell cell : cs) {
-                String familyName = Bytes.toString(CellUtil.cloneFamily(cell));
-                if (results.get(familyName) == null) {
-                    results.put(familyName, new HashMap<String,  String> ());
-                }
-                results.get(familyName).put(Bytes.toString(CellUtil.cloneQualifier(cell)), Bytes.toString(CellUtil.cloneValue(cell)));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return results;
     }
 
     /**
@@ -220,18 +84,33 @@ public class HBaseDaoUtil {
      * @param param
      * @Date: 2018/3/26
      */
-    public <T> List<T> queryScan(T obj, Map<String, String> param){
+    public <T> List<T> queryScan(T obj, Map<String, String> param)throws Exception{
         List<T> objs = new ArrayList<T>();
-        try {
-            String tableName = getORMTable(obj);
-            if (StringUtils.isBlank(tableName)) {
-                return null;
+        String tableName = getORMTable(obj);
+        if (StringUtils.isBlank(tableName)) {
+            return null;
+        }
+        try (Table table = HconnectionFactory.connection.getTable(TableName.valueOf(tableName));Admin admin = HconnectionFactory.connection.getAdmin();){
+            if(!admin.isTableAvailable(TableName.valueOf(tableName))){
+                return objs;
             }
-            Table table = HconnectionFactory.connection.getTable(TableName.valueOf(tableName));
             Scan scan = new Scan();
             for (Map.Entry<String, String> entry : param.entrySet()){
-                Filter filter = new SingleColumnValueFilter(Bytes.toBytes(entry.getKey()), null, CompareFilter.CompareOp.EQUAL, Bytes.toBytes(entry.getValue()));
-                scan.setFilter(filter);
+                Class<?> clazz = obj.getClass();
+                Field[] fields = clazz.getDeclaredFields();
+                for (Field field : fields) {
+                    if (!field.isAnnotationPresent(HbaseColumn.class)) {
+                        continue;
+                    }
+                    field.setAccessible(true);
+                    HbaseColumn orm = field.getAnnotation(HbaseColumn.class);
+                    String family = orm.family();
+                    String qualifier = orm.qualifier();
+                    if(qualifier.equals(entry.getKey())){
+                        Filter filter = new SingleColumnValueFilter(Bytes.toBytes(family), Bytes.toBytes(entry.getKey()), CompareFilter.CompareOp.EQUAL, Bytes.toBytes(entry.getValue()));
+                        scan.setFilter(filter);
+                    }
+                }
             }
             ResultScanner scanner = table.getScanner(scan);
             for (Result result : scanner) {
@@ -240,6 +119,8 @@ public class HBaseDaoUtil {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            logger.error("查询失败！");
+            throw new Exception(e);
         }
         return objs;
     }
@@ -251,28 +132,36 @@ public class HBaseDaoUtil {
      * @param rowkeys
      * @Date: 2018/3/22
      */
-    public <T> List<T> get(T obj, String... rowkeys) {
+    public <T> List<T> get(T obj, String ... rowkeys) {
         List<T> objs = new ArrayList<T>();
         String tableName = getORMTable(obj);
         if (StringUtils.isBlank(tableName)) {
             return objs;
         }
-        List<Result> results = getResults(tableName, rowkeys);
-        if (results.isEmpty()) {
-            return objs;
-        }
-        for (int i = 0; i < results.size(); i++) {
-            T bean = null;
-            Result result = results.get(i);
-            if (result == null || result.isEmpty()) {
-                continue;
+        try (Table table = HconnectionFactory.connection.getTable(TableName.valueOf(tableName));Admin admin = HconnectionFactory.connection.getAdmin();){
+            if(!admin.isTableAvailable(TableName.valueOf(tableName))){
+                return objs;
             }
-            try {
-                bean = HBaseBeanUtil.resultToBean(result, obj);
-                objs.add(bean);
-            } catch (Exception e) {
-                logger.warn("", e);
+            List<Result> results = getResults(tableName, rowkeys);
+            if (results.isEmpty()) {
+                return objs;
             }
+            for (int i = 0; i < results.size(); i++) {
+                T bean = null;
+                Result result = results.get(i);
+                if (result == null || result.isEmpty()) {
+                    continue;
+                }
+                try {
+                    bean = HBaseBeanUtil.resultToBean(result, obj);
+                    objs.add(bean);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    logger.error("查询异常！", e);
+                }
+            }
+        }catch (Exception e){
+            e.printStackTrace();
         }
         return objs;
     }
@@ -287,15 +176,39 @@ public class HBaseDaoUtil {
     public <T> boolean save(T ... objs) {
         List<Put> puts = new ArrayList<Put>();
         String tableName = "";
-        for (Object obj : objs) {
-            if (obj == null) continue;
-            tableName = getORMTable(obj);
-            try {
+        try (Admin admin = HconnectionFactory.connection.getAdmin();){
+            for (Object obj : objs) {
+                if (obj == null) {
+                    continue;
+                }
+                tableName = getORMTable(obj);
+                // 表不存在，先获取family创建表
+                if(!admin.isTableAvailable(TableName.valueOf(tableName))){
+                    // 获取family, 创建表
+                    Class<?> clazz = obj.getClass();
+                    Field[] fields = clazz.getDeclaredFields();
+                    Set<String> set = new HashSet<>(10);
+                    for(int i=0;i<fields.length;i++){
+                        if (!fields[i].isAnnotationPresent(HbaseColumn.class)) {
+                            continue;
+                        }
+                        fields[i].setAccessible(true);
+                        HbaseColumn orm = fields[i].getAnnotation(HbaseColumn.class);
+                        String family = orm.family();
+                        if ("rowkey".equalsIgnoreCase(family)) {
+                            continue;
+                        }
+                        set.add(family);
+                    }
+                    // 创建表
+                    createTable(tableName, set);
+                }
                 Put put = HBaseBeanUtil.beanToPut(obj);
                 puts.add(put);
-            } catch (Exception e) {
-                logger.warn("", e);
             }
+        }catch (Exception e){
+            e.printStackTrace();
+            logger.error("保存Hbase异常！");
         }
         return savePut(puts, tableName);
     }
@@ -310,7 +223,9 @@ public class HBaseDaoUtil {
     public <T> void save(String tableName, T ... objs){
         List<Put> puts = new ArrayList<Put>();
         for (Object obj : objs) {
-            if (obj == null) continue;
+            if (obj == null) {
+                continue;
+            }
             try {
                 Put put = HBaseBeanUtil.beanToPut(obj);
                 puts.add(put);
@@ -355,10 +270,12 @@ public class HBaseDaoUtil {
     private void delete(List<Delete> deletes, String tableName) {
         try (Table table = HconnectionFactory.connection.getTable(TableName.valueOf(tableName));) {
             if (StringUtils.isBlank(tableName)) {
+                logger.info("tableName为空！");
                 return;
             }
             table.delete(deletes);
         } catch (IOException e) {
+            e.printStackTrace();
             logger.error("删除失败！",e);
         }
     }
@@ -383,6 +300,7 @@ public class HBaseDaoUtil {
             }
             return columns;
         } catch (Exception e) {
+            e.printStackTrace();
             logger.error("查询列簇名称失败！" ,e);
         }
         return new ArrayList<String>();
@@ -394,9 +312,6 @@ public class HBaseDaoUtil {
             return false;
         }
         try (Table table = HconnectionFactory.connection.getTable(TableName.valueOf(tableName));Admin admin = HconnectionFactory.connection.getAdmin();){
-            if(!admin.isTableAvailable(TableName.valueOf(tableName))){ // 表不存在
-                createTable(tableName, tableName);
-            }
             table.put(puts);
             return true;
         }catch (IOException e) {
@@ -430,5 +345,53 @@ public class HBaseDaoUtil {
             e.printStackTrace();
             return resultList;
         }
+    }
+    
+    /**
+     * @Descripton: 根据条件过滤查询（大于等于）
+     * @Author: Sorin
+     * @param obj
+     * @param param
+     * @Date: 2018/3/26
+     */
+    public <T> List<T> queryScanGreater(T obj, Map<String, String> param)throws Exception{
+        List<T> objs = new ArrayList<T>();
+        String tableName = getORMTable(obj);
+        if (StringUtils.isBlank(tableName)) {
+            return null;
+        }
+        try (Table table = HconnectionFactory.connection.getTable(TableName.valueOf(tableName));Admin admin = HconnectionFactory.connection.getAdmin();){
+            if(!admin.isTableAvailable(TableName.valueOf(tableName))){
+                return objs;
+            }
+            Scan scan = new Scan();
+            for (Map.Entry<String, String> entry : param.entrySet()){
+                Class<?> clazz = obj.getClass();
+                Field[] fields = clazz.getDeclaredFields();
+                for (Field field : fields) {
+                    if (!field.isAnnotationPresent(HbaseColumn.class)) {
+                        continue;
+                    }
+                    field.setAccessible(true);
+                    HbaseColumn orm = field.getAnnotation(HbaseColumn.class);
+                    String family = orm.family();
+                    String qualifier = orm.qualifier();
+                    if(qualifier.equals(entry.getKey())){
+                        Filter filter = new SingleColumnValueFilter(Bytes.toBytes(family), Bytes.toBytes(entry.getKey()), CompareFilter.CompareOp.GREATER_OR_EQUAL, Bytes.toBytes(entry.getValue()));
+                        scan.setFilter(filter);
+                    }
+                }
+            }
+            ResultScanner scanner = table.getScanner(scan);
+            for (Result result : scanner) {
+                T beanClone = (T)BeanUtils.cloneBean(HBaseBeanUtil.resultToBean(result, obj));
+                objs.add(beanClone);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            logger.error("查询失败！");
+            throw new Exception(e);
+        }
+        return objs;
     }
 }

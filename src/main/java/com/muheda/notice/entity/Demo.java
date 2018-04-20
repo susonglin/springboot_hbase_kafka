@@ -8,16 +8,16 @@ import com.muheda.notice.hbase.HbaseTable;
  * @Descriptions:
  * @Date: Created in 2018/3/22
  */
-@HbaseTable(tableName="mhd-shop")
+@HbaseTable(tableName="t_demo")
 public class Demo {
 
 	@HbaseColumn(family="rowkey", qualifier="rowkey")
 	private String id;
 
-	@HbaseColumn(family="sorin2", qualifier="conn")
+	@HbaseColumn(family="demo", qualifier="content")
 	private String content;
 
-	@HbaseColumn(family="sorin2", qualifier="bytes")
+	@HbaseColumn(family="demo", qualifier="avg")
 	private String avg;
 
 	public String getId() {
