@@ -4,6 +4,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
 /**
@@ -25,8 +26,10 @@ public class Listener {
     }
 
     @KafkaListener(topics = {"notice2"})
-    public void listen2(ConsumerRecord<?, ?> record) {
+    public void listen2(ConsumerRecord<?, ?> record, Acknowledgment acknowledgment) {
         logger.info("kafka2的key: " + record.key());
         logger.info("kafka2的value: " + record.value().toString());
+        // 手动提交偏移量
+        acknowledgment.acknowledge();
     }
 }

@@ -1,19 +1,9 @@
 server:
   port: 8080
 
-logging:
-  path: /Users/sorin/Desktop
-  level:
-    com:
-      favorites: DEBUG
-    org:
-      springframework:
-        web: INFO
-      mybaties: ERROR
-
-REDIS:
-  URL: nginx-18
-  PORT: 6379
+log:
+  path: /Users/sorin/Desktop/log
+  level: INFO
 
 hbase:
   master: hadoop-11:60000
@@ -32,7 +22,7 @@ kafka:
     servers: 127.0.0.1:9092
     enable:
       auto:
-        commit: true
+        commit: false
     session:
       timeout: 6000
     auto:

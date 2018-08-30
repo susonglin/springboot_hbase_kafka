@@ -394,4 +394,42 @@ public class HBaseDaoUtil {
         }
         return objs;
     }
+
+    /**
+     * 根据rowkey查询记录
+     * @param obj
+     * @param rowkey
+     * @param <T>
+     * @return
+     */
+    public <T> List<T> queryScanRowkey(T obj, String rowkey){
+        List<T> objs = new ArrayList<T>();
+        String tableName = getORMTable(obj);
+        if (StringUtils.isBlank(tableName)) {
+            return null;
+        }
+        ResultScanner scanner = null;
+        try (Table table = HconnectionFactory.connection.getTable(TableName.valueOf(tableName));Admin admin = HconnectionFactory.connection.getAdmin()){
+            Scan scan = new Scan();
+            scan.setRowPrefixFilter(Bytes.toBytes(rowkey));
+            scanner = table.getScanner(scan);
+            for (Result result : scanner) {
+                T beanClone = (T)BeanUtils.cloneBean(HBaseBeanUtil.resultToBean(result, obj));
+                objs.add(beanClone);
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+            logger.error("queryScanRowkey:查询失败！", e);
+        }finally {
+            if(scanner!=null){
+                try {
+                    scanner.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    logger.error("queryScan:关闭流异常！", e);
+                }
+            }
+        }
+        return objs;
+    }
 }
