@@ -39,3 +39,9 @@
 
 
 7、Listener中@KafkaListener(topics = {"notice"})注解的方法为一个接口数据来源    
+
+
+8、
+
+    GitHub地址：https://github.com/susonglin/springboot_hbase_kafka
+    码云地址：https://gitee.com/susonglin/springboot_hbase_kafka
